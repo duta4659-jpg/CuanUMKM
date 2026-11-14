@@ -42,16 +42,15 @@ interface BuyerFlowProps {
 export const BuyerFlow: React.FC<BuyerFlowProps> = ({
   onBack,
   recipes,
-  buyerDefaultName = 'Pak Budi Santoso',
-  buyerDefaultPhone = '0812-8877-6655',
-  buyerDefaultAddress = 'Jl. Cisangkuy No. 25, Cihapit',
+  buyerDefaultName = '',
+  buyerDefaultPhone = '',
+  buyerDefaultAddress = '',
   orders,
   onCreateOrder,
 }) => {
-  // Only show approved recipes in catalog (fallback to all if none approved)
+  // Only show approved recipes in catalog
   const approvedRecipes = React.useMemo(() => {
-    const filtered = recipes.filter((r) => r.status === 'approved');
-    return filtered.length > 0 ? filtered : recipes;
+    return recipes.filter((r) => r.status === 'approved');
   }, [recipes]);
 
   // Step: 'rules' | 'list' | 'detail_preview' | 'checkout' | 'waiting_approval' | 'unlocked_recipe'
@@ -60,16 +59,16 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
   >('rules');
 
   const [agreedToRules, setAgreedToRules] = useState(false);
-  const [selectedRecipe, setSelectedRecipe] = useState<Recipe>(approvedRecipes[0]);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
 
   // Buyer Form Inputs
   const [buyerName, setBuyerName] = useState(buyerDefaultName);
   const [buyerPhone, setBuyerPhone] = useState(buyerDefaultPhone);
   const [buyerAddress, setBuyerAddress] = useState(buyerDefaultAddress);
-  const [buyerCity, setBuyerCity] = useState('Bandung');
+  const [buyerCity, setBuyerCity] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'qris' | 'transfer'>('qris');
 
-  // Distance calculation simulation (e.g. 48 KM for safe, or 8 KM for warning)
+  // Distance calculation state
   const [distanceKm, setDistanceKm] = useState<number>(48);
   const [orderStatus, setOrderStatus] = useState<'waiting' | 'approved' | 'rejected'>('waiting');
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
@@ -91,22 +90,13 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
     }
   }, [liveOrder, currentStep]);
 
-  // Chat bimbingan state
+  // Chat bimbingan state (clean empty start)
   const [chatInput, setChatInput] = useState('');
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: 'msg_1',
-      sender: 'seller',
-      senderName: 'Penjual Resep',
-      text: 'Halo! Alhamdulillah resep sudah Anda miliki secara sah. Silakan baca bahan & takarannya. Kalau ada yang bingung saat belanja atau masak, langsung chat saya di sini ya!',
-      time: 'Baru saja',
-    },
-  ]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
   const handleSelectRecipe = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
-    // If buyer city matches seller city, simulate close distance, else farther distance
-    if (buyerCity.toLowerCase().includes(recipe.city.toLowerCase())) {
+    if (buyerCity && buyerCity.toLowerCase().includes(recipe.city.toLowerCase())) {
       setDistanceKm(8);
     } else {
       setDistanceKm(52);
@@ -119,6 +109,7 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
   };
 
   const handleConfirmPayment = () => {
+    if (!selectedRecipe) return;
     const newOrderId = `ord_${Date.now()}`;
     const newOrder: RecipeOrder = {
       id: newOrderId,
@@ -129,10 +120,10 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
       sellerWarung: selectedRecipe.sellerWarung,
       sellerPhone: selectedRecipe.sellerPhone,
       sellerCity: selectedRecipe.city,
-      buyerName: buyerName.trim() || buyerDefaultName,
-      buyerPhone: buyerPhone.trim() || buyerDefaultPhone,
-      buyerAddress: buyerAddress.trim() || buyerDefaultAddress,
-      buyerCity,
+      buyerName: buyerName.trim() || 'Pembeli',
+      buyerPhone: buyerPhone.trim() || '-',
+      buyerAddress: buyerAddress.trim() || '-',
+      buyerCity: buyerCity || '-',
       distanceKm,
       price: selectedRecipe.price,
       status: 'waiting_approval',
@@ -151,26 +142,12 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
     const newMsg: ChatMessage = {
       id: `chat_${Date.now()}`,
       sender: 'buyer',
-      senderName: buyerName,
+      senderName: buyerName.trim() || 'Pembeli',
       text: chatInput.trim(),
       time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
     };
     setChatMessages((prev) => [...prev, newMsg]);
     setChatInput('');
-
-    // Simulated quick reply from seller
-    setTimeout(() => {
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          id: `chat_reply_${Date.now()}`,
-          sender: 'seller',
-          senderName: selectedRecipe.sellerName,
-          text: 'Siap Pak! Untuk api penggorengan memang harus stabil di api sedang ya. Mau kita jadwalkan video call via WhatsApp nanti sore?',
-          time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
-    }, 1200);
   };
 
   // ==========================================
@@ -360,6 +337,17 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
         </div>
 
         {/* LIST KE BAWAH 1-1, FOTO BESAR (BUKAN KOTAK KECIL SHOPEE) */}
+        {approvedRecipes.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-2">
+            <ChefHat className="w-10 h-10 text-slate-300 mx-auto" />
+            <h3 className="text-sm font-bold text-slate-700">
+              Belum Ada Resep Terkurasi
+            </h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+              Saat ini belum ada resep yang tayang. Resep yang dikirim penjual dan lolos kurasi admin akan tampil di halaman ini.
+            </p>
+          </div>
+        ) : (
         <div className="space-y-4">
           {approvedRecipes.map((rcp) => (
             <div
@@ -369,11 +357,17 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
             >
               {/* Foto Besar Menggugah Selera */}
               <div className="relative h-48 sm:h-56 w-full overflow-hidden bg-slate-100">
-                <img
-                  src={rcp.photoUrl}
-                  alt={rcp.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
+                {rcp.photoUrl ? (
+                  <img
+                    src={rcp.photoUrl}
+                    alt={rcp.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-teal-700 to-slate-800 flex items-center justify-center">
+                    <ChefHat className="w-16 h-16 text-teal-200/70" />
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/20" />
 
                 {/* Badges on image */}
@@ -443,6 +437,7 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
             </div>
           ))}
         </div>
+        )}
       </div>
     );
   }
@@ -450,7 +445,7 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
   // ==========================================
   // VIEW 3: TATA CARA 2 - PREVIEW RESEP (DETAIL TERKUNCI)
   // ==========================================
-  if (currentStep === 'detail_preview') {
+  if (currentStep === 'detail_preview' && selectedRecipe) {
     return (
       <div className="space-y-4 max-w-2xl mx-auto pb-10">
         <div className="flex items-center gap-3">
@@ -472,11 +467,17 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs space-y-5 p-5">
           {/* Big Photo & Title */}
           <div className="relative rounded-2xl overflow-hidden h-52 sm:h-64 border border-slate-200">
-            <img
-              src={selectedRecipe.photoUrl}
-              alt={selectedRecipe.title}
-              className="w-full h-full object-cover"
-            />
+            {selectedRecipe.photoUrl ? (
+              <img
+                src={selectedRecipe.photoUrl}
+                alt={selectedRecipe.title}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-teal-700 to-slate-800 flex items-center justify-center">
+                <ChefHat className="w-16 h-16 text-teal-200/70" />
+              </div>
+            )}
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent" />
             <div className="absolute bottom-3 left-4 right-4 text-white">
               <span className="px-2 py-0.5 rounded bg-teal-600 text-white text-[11px] font-bold">
@@ -568,7 +569,7 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
   // ==========================================
   // VIEW 4: TATA CARA 3 - FORM BELI & TITIK MAPS JUALAN (CHECKOUT)
   // ==========================================
-  if (currentStep === 'checkout') {
+  if (currentStep === 'checkout' && selectedRecipe) {
     const isUnder15Km = distanceKm < 15;
 
     return (
@@ -594,11 +595,17 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
           {/* Ringkasan Resep */}
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center gap-3">
-            <img
-              src={selectedRecipe.photoUrl}
-              alt={selectedRecipe.title}
-              className="w-14 h-14 rounded-lg object-cover shrink-0 border border-slate-300"
-            />
+            {selectedRecipe.photoUrl ? (
+              <img
+                src={selectedRecipe.photoUrl}
+                alt={selectedRecipe.title}
+                className="w-14 h-14 rounded-lg object-cover shrink-0 border border-slate-300"
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-lg bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-600 shrink-0">
+                <ChefHat className="w-6 h-6" />
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <h4 className="font-bold text-xs sm:text-sm text-slate-800 truncate">
                 {selectedRecipe.title}
@@ -667,8 +674,8 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
                   onChange={(e) => {
                     const c = e.target.value;
                     setBuyerCity(c);
-                    // Dynamically toggle distance for testing
-                    if (c.toLowerCase().includes(selectedRecipe.city.toLowerCase())) {
+                    // Dynamically toggle distance check
+                    if (c && c.toLowerCase().includes(selectedRecipe.city.toLowerCase())) {
                       setDistanceKm(7.5);
                     } else {
                       setDistanceKm(48);
@@ -676,10 +683,15 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
                   }}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm text-slate-800 focus:outline-none focus:border-teal-500 bg-white"
                 >
-                  <option value="Bandung">Bandung (Jarak ~140 KM - Aman)</option>
-                  <option value="Semarang">Semarang (Jarak ~400 KM - Aman)</option>
-                  <option value="Yogyakarta">Yogyakarta (Jarak ~500 KM - Aman)</option>
-                  <option value="Jakarta Selatan">Jakarta Selatan (Jarak ~7.5 KM - Dalam Radius Warung Penjual)</option>
+                  <option value="">-- Pilih Kota / Wilayah --</option>
+                  <option value="Bandung">Bandung</option>
+                  <option value="Semarang">Semarang</option>
+                  <option value="Yogyakarta">Yogyakarta</option>
+                  <option value="Jakarta Selatan">Jakarta Selatan</option>
+                  <option value="Surabaya">Surabaya</option>
+                  <option value="Malang">Malang</option>
+                  <option value="Solo">Solo</option>
+                  <option value="Lainnya">Kota Lainnya</option>
                 </select>
               </div>
             </div>
@@ -782,7 +794,7 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
   // ==========================================
   // VIEW 5: TATA CARA 4 - MENUNGGU PERSETUJUAN PENJUAL (RADIUS 15 KM)
   // ==========================================
-  if (currentStep === 'waiting_approval') {
+  if (currentStep === 'waiting_approval' && selectedRecipe) {
     const isUnder15Km = distanceKm < 15;
 
     return (
@@ -864,6 +876,10 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
   // ==========================================
   // VIEW 6: TATA CARA 5 - RESEP LENGKAP TERBUKA + WATERMARK + CHAT BIMBINGAN 7 HARI
   // ==========================================
+  if (!selectedRecipe) {
+    return null;
+  }
+
   return (
     <div className="space-y-5 max-w-2xl mx-auto pb-12">
       {/* Top Header */}
@@ -1018,28 +1034,34 @@ export const BuyerFlow: React.FC<BuyerFlowProps> = ({
 
         {/* Chat message history */}
         <div className="p-4 space-y-3 max-h-64 overflow-y-auto">
-          {chatMessages.map((msg) => {
-            const isMe = msg.sender === 'buyer';
-            return (
-              <div
-                key={msg.id}
-                className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
-              >
-                <span className="text-[10px] text-slate-400 mb-0.5 px-1">
-                  {msg.senderName} • {msg.time}
-                </span>
+          {chatMessages.length === 0 ? (
+            <p className="text-center text-xs text-slate-400 py-4">
+              Belum ada pesan. Mulai tanya penjual seputar takaran atau teknik memasak di bawah ini.
+            </p>
+          ) : (
+            chatMessages.map((msg) => {
+              const isMe = msg.sender === 'buyer';
+              return (
                 <div
-                  className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed ${
-                    isMe
-                      ? 'bg-teal-600 text-white rounded-br-xs'
-                      : 'bg-slate-100 text-slate-800 rounded-bl-xs border border-slate-200'
-                  }`}
+                  key={msg.id}
+                  className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                 >
-                  {msg.text}
+                  <span className="text-[10px] text-slate-400 mb-0.5 px-1">
+                    {msg.senderName} • {msg.time}
+                  </span>
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed ${
+                      isMe
+                        ? 'bg-teal-600 text-white rounded-br-xs'
+                        : 'bg-slate-100 text-slate-800 rounded-bl-xs border border-slate-200'
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
 
         {/* Chat Input form */}

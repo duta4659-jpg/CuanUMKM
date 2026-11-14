@@ -283,11 +283,17 @@ export const AdminPanelPage: React.FC<AdminPanelPageProps> = ({
                     {/* Header Row: Recipe + Status Badge */}
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 min-w-0">
-                        <img
-                          src={ord.recipePhoto}
-                          alt={ord.recipeTitle}
-                          className="w-14 h-14 rounded-xl object-cover border border-slate-200 shrink-0"
-                        />
+                        {ord.recipePhoto ? (
+                          <img
+                            src={ord.recipePhoto}
+                            alt={ord.recipeTitle}
+                            className="w-14 h-14 rounded-xl object-cover border border-slate-200 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-600 shrink-0">
+                            <CookingPot className="w-6 h-6" />
+                          </div>
+                        )}
                         <div className="min-w-0">
                           <h3 className="font-extrabold text-sm text-slate-900 leading-snug">
                             {ord.recipeTitle}
@@ -402,7 +408,12 @@ export const AdminPanelPage: React.FC<AdminPanelPageProps> = ({
       {/* SECTION 2: KURASI PENGAJUAN RESEP PENJUAL */}
       {activeSection === 'submissions' && (
         <div className="space-y-3">
-          {sortedRecipes.map((rcp) => (
+          {sortedRecipes.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-xs text-slate-400">
+              Belum ada pengajuan resep dari penjual untuk dikurasi.
+            </div>
+          ) : (
+            sortedRecipes.map((rcp) => (
             <div
               key={rcp.id}
               className={`rounded-2xl border p-4 shadow-xs space-y-3 ${
@@ -413,11 +424,17 @@ export const AdminPanelPage: React.FC<AdminPanelPageProps> = ({
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3 min-w-0">
-                  <img
-                    src={rcp.photoUrl}
-                    alt={rcp.title}
-                    className="w-16 h-16 rounded-xl object-cover border border-slate-200 shrink-0"
-                  />
+                  {rcp.photoUrl ? (
+                    <img
+                      src={rcp.photoUrl}
+                      alt={rcp.title}
+                      className="w-16 h-16 rounded-xl object-cover border border-slate-200 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-600 shrink-0">
+                      <CookingPot className="w-7 h-7" />
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <h4 className="font-extrabold text-sm text-slate-900 leading-snug">
                       {rcp.title}
@@ -488,7 +505,8 @@ export const AdminPanelPage: React.FC<AdminPanelPageProps> = ({
                 </button>
               </div>
             </div>
-          ))}
+          ))
+          )}
         </div>
       )}
     </div>

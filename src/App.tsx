@@ -19,7 +19,7 @@ import {
 import type { Transaction, UserProfile, AuthUser } from './types';
 import type { Recipe, RecipeOrder } from './types/recipe';
 import { getTodayDateString } from './utils/formatters';
-import { DEFAULT_PROFILE, getInitialTransactions } from './utils/initialData';
+import { DEFAULT_PROFILE } from './utils/initialData';
 import {
   loadRecipesFromStorage,
   saveRecipesToStorage,
@@ -94,22 +94,41 @@ export default function App() {
     }, 3200);
   }, []);
 
-  // 1. Initial Load: Load profile & transactions from LocalStorage
+  // 1. Initial Load: Load profile & transactions from LocalStorage (clean start for new users)
   useEffect(() => {
     try {
       const savedProfile = localStorage.getItem(LOCAL_STORAGE_PROFILE_KEY);
       if (savedProfile) {
-        setProfile(JSON.parse(savedProfile));
+        const parsedProfile = JSON.parse(savedProfile) as UserProfile;
+        const isLegacyDemoProfile =
+          parsedProfile.businessName === 'Warung Berkah UMKM' &&
+          parsedProfile.ownerName === 'Bu Siti Rahayu' &&
+          parsedProfile.phone === '0812-3456-7890' &&
+          parsedProfile.initialCash === 500000;
+        if (isLegacyDemoProfile) {
+          localStorage.removeItem(LOCAL_STORAGE_PROFILE_KEY);
+          setProfile(DEFAULT_PROFILE);
+        } else {
+          setProfile(parsedProfile);
+        }
       }
 
       const savedTx = localStorage.getItem(LOCAL_STORAGE_TX_KEY);
       if (savedTx) {
-        setTransactions(JSON.parse(savedTx));
+        const parsedTx = JSON.parse(savedTx);
+        if (Array.isArray(parsedTx)) {
+          const cleanedTx = parsedTx.filter(
+            (tx: Transaction) => tx && typeof tx.id === 'string' && !tx.id.startsWith('tx_init_')
+          );
+          if (cleanedTx.length !== parsedTx.length) {
+            localStorage.setItem(LOCAL_STORAGE_TX_KEY, JSON.stringify(cleanedTx));
+          }
+          setTransactions(cleanedTx);
+        } else {
+          setTransactions([]);
+        }
       } else {
-        // Populate with friendly default warung data
-        const initial = getInitialTransactions('guest');
-        setTransactions(initial);
-        localStorage.setItem(LOCAL_STORAGE_TX_KEY, JSON.stringify(initial));
+        setTransactions([]);
       }
     } catch (e) {
       console.error('Failed to load local data', e);
@@ -130,7 +149,7 @@ export default function App() {
             setProfile(cloudProfile);
             localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(cloudProfile));
           } else {
-            // First time login: seed user profile in Firestore
+            // First time login: initialize user profile in Firestore
             const newProfile: UserProfile = {
               ...profile,
               userId: user.uid,
@@ -150,10 +169,9 @@ export default function App() {
             if (cloudTransactions && cloudTransactions.length > 0) {
               setTransactions(cloudTransactions);
               localStorage.setItem(LOCAL_STORAGE_TX_KEY, JSON.stringify(cloudTransactions));
-            } else {
-              // If cloud is empty, upload existing local demo transactions for this user
-              const localTx = transactions.length > 0 ? transactions : getInitialTransactions(user.uid);
-              localTx.forEach((tx) => {
+            } else if (transactions.length > 0) {
+              // Upload any real local transactions created before sign-in
+              transactions.forEach((tx) => {
                 saveTransaction({
                   ...tx,
                   userId: user.uid,
@@ -415,14 +433,6 @@ export default function App() {
     }
   };
 
-  // Reset to Demo Data
-  const handleResetDemo = () => {
-    const demo = getInitialTransactions(authUser ? authUser.uid : 'guest');
-    setTransactions(demo);
-    localStorage.setItem(LOCAL_STORAGE_TX_KEY, JSON.stringify(demo));
-    showToast('Data demo berhasil dimuat ulang!');
-  };
-
   // Today calculations
   const todayStr = getTodayDateString();
   const todayTransactions = useMemo(() => {
@@ -465,7 +475,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col antialiased selection:bg-teal-100 selection:text-teal-900 pb-24">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col antialiased selection:bg-teal-100 selection:text-teal-900">
       {/* 1. Header with branding & sync status */}
       <Header
         businessName={profile.businessName}
@@ -476,8 +486,8 @@ export default function App() {
         onSecretLogoTap={handleSecretLogoTap}
       />
 
-      {/* Main Container */}
-      <main className="max-w-4xl mx-auto w-full px-4 pt-4 flex-1">
+      {/* Main Container (generous bottom clearance for floating dock & future banner space) */}
+      <main className="max-w-4xl mx-auto w-full px-4 pt-4 pb-40 sm:pb-44 flex-1">
         {isAdminPanelOpen ? (
           <AdminPanelPage
             orders={recipeOrders}
@@ -503,8 +513,8 @@ export default function App() {
                     }}
                     sellerWarungName={profile.businessName}
                     sellerOwnerName={profile.ownerName}
-                    sellerPhone={profile.phone || '0812-3456-7890'}
-                    sellerAddress={profile.address || 'Jl. Pasar Minggu No. 45'}
+                    sellerPhone={profile.phone || ''}
+                    sellerAddress={profile.address || ''}
                     isAuthenticated={Boolean(authUser)}
                     onRequireAuth={requireAuth}
                     recipes={recipes}
@@ -585,7 +595,6 @@ export default function App() {
                   onLogout={handleLogout}
                   transactions={transactions}
                   onRestoreTransactions={handleRestoreTransactions}
-                  onResetDemo={handleResetDemo}
                   isFirebaseConnected={isFirebaseConnected}
                   recipeOrders={recipeOrders}
                   onOrderDecision={handleAdminOrderDecision}
@@ -641,7 +650,7 @@ export default function App() {
       {/* Toast Notification */}
       {toastMessage && (
         <div
-          className={`fixed bottom-20 left-1/2 -translate-x-1/2 z-50 backdrop-blur-md text-white px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 text-xs sm:text-sm font-semibold border animate-in slide-in-from-bottom-3 duration-200 ${
+          className={`fixed bottom-28 left-1/2 -translate-x-1/2 z-50 backdrop-blur-md text-white px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2 text-xs sm:text-sm font-semibold border animate-in slide-in-from-bottom-3 duration-200 ${
             toastVariant === 'error'
               ? 'bg-rose-900/95 border-rose-700'
               : 'bg-slate-900/90 border-slate-700'

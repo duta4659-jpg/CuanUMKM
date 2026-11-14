@@ -174,7 +174,7 @@ export const ReportPage: React.FC<ReportPageProps> = ({
 
       doc.setFontSize(12);
       doc.setTextColor(13, 148, 136);
-      doc.text(businessName || 'Warung Berkah UMKM', 14, 28);
+      doc.text(businessName || 'Usaha UMKM', 14, 28);
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
@@ -309,7 +309,7 @@ export const ReportPage: React.FC<ReportPageProps> = ({
       doc.text(ownerName, 14, sigY + 32);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7.5);
-      doc.text(businessName || 'Warung Berkah UMKM', 14, sigY + 36);
+      doc.text(businessName || 'Usaha UMKM', 14, sigY + 36);
 
       // Kolom Tanda Tangan Kanan: Bank / Pihak Verifikator
       doc.setFontSize(8.5);
@@ -344,7 +344,7 @@ export const ReportPage: React.FC<ReportPageProps> = ({
   // Share text to WhatsApp
   const handleShareWhatsApp = () => {
     const text = `📊 *Laporan Keuangan CuanUMKM*
-*${businessName || 'Warung Berkah UMKM'}*
+*${businessName || 'Usaha UMKM'}*
 Periode: ${periodLabel}
 ---------------------------------
 💰 *Pemasukan:* ${formatRupiah(totalIncome)} (${incomeList.length} tx)

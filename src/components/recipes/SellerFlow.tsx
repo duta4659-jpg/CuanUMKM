@@ -52,74 +52,26 @@ export const SellerFlow: React.FC<SellerFlowProps> = ({
   // Rules agreement
   const [agreedToRules, setAgreedToRules] = useState(false);
 
-  // Form Step 1: Info dasar & Omzet
+  // Form Step 1: Info dasar & Omzet (bersih tanpa data dummy)
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Ayam & Unggas');
-  const [price, setPrice] = useState<number>(250000);
-  const [priceStr, setPriceStr] = useState('250.000');
-  const [photoUrl, setPhotoUrl] = useState(
-    'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=900&q=80'
-  );
+  const [price, setPrice] = useState<number>(0);
+  const [priceStr, setPriceStr] = useState('');
+  const [photoUrl, setPhotoUrl] = useState('');
   const [omzetDesc, setOmzetDesc] = useState('');
-  const [portionPerDay, setPortionPerDay] = useState(80);
+  const [portionPerDay, setPortionPerDay] = useState(0);
 
   // Form Step 2: Detail Rahasia (TERKUNCI)
-  const [ingredientsText, setIngredientsText] = useState(
-    '10 kg Ayam Segar potong 8\n1.200 gram Lengkuas parut muda\n350 gram Bawang putih kating\n250 gram Bawang merah\n150 gram Kemiri sangrai\n80 gram Ketumbar sangrai\n3 liter Air kelapa murni ungkep'
-  );
-  const [secretTricksText, setSecretTricksText] = useState(
-    'Wajib pakai air kelapa murni saat ungkep dengan api lilin 45 menit agar bumbu meresap ke tulang.\nGoreng serundeng lengkuas secara terpisah dengan minyak baru suhu 160°C agar keemasan dan tidak pahit.'
-  );
-  const [stepsText, setStepsText] = useState(
-    '1. Haluskan bumbu rempah.\n2. Campur ayam, lengkuas parut, dan air kelapa di wajan.\n3. Masak api kecil hingga susut.\n4. Goreng ayam deep-fry saat disajikan.'
-  );
+  const [ingredientsText, setIngredientsText] = useState('');
+  const [secretTricksText, setSecretTricksText] = useState('');
+  const [stepsText, setStepsText] = useState('');
 
   // Form Step 3: Alamat & Titik Maps Warung
-  const [warungAddress, setWarungAddress] = useState(sellerAddress || 'Jl. Pasar Minggu Raya No. 45');
-  const [city, setCity] = useState('Jakarta Selatan');
+  const [warungAddress, setWarungAddress] = useState(sellerAddress || '');
+  const [city, setCity] = useState('');
   const [isMapConfirmed, setIsMapConfirmed] = useState(true);
 
-  // Simulated Orders for the seller to demonstrate the 15 KM logic
-  const [simulatedOrders, setSimulatedOrders] = useState<RecipeOrder[]>([
-    {
-      id: 'ord_demo_1',
-      recipeId: 'rcp_demo',
-      recipeTitle: 'Ayam Goreng Lengkuas Rempah Basah Renyah',
-      recipePhoto: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=900&q=80',
-      sellerName: sellerOwnerName || 'Bu Siti',
-      sellerWarung: sellerWarungName || 'Warung Berkah',
-      sellerPhone: sellerPhone || '0812-3456-7890',
-      sellerCity: city,
-      buyerName: 'Pak Joko Santoso',
-      buyerPhone: '0813-7766-5544',
-      buyerAddress: 'Jl. Riau No. 18, Kota Bandung',
-      buyerCity: 'Bandung',
-      distanceKm: 142, // > 15 KM
-      price: 250000,
-      status: 'waiting_approval',
-      paymentMethod: 'qris',
-      createdAt: 'Baru saja',
-    },
-    {
-      id: 'ord_demo_2',
-      recipeId: 'rcp_demo',
-      recipeTitle: 'Ayam Goreng Lengkuas Rempah Basah Renyah',
-      recipePhoto: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=900&q=80',
-      sellerName: sellerOwnerName || 'Bu Siti',
-      sellerWarung: sellerWarungName || 'Warung Berkah',
-      sellerPhone: sellerPhone || '0812-3456-7890',
-      sellerCity: city,
-      buyerName: 'Ibu Ratna Dewi',
-      buyerPhone: '0857-4433-2211',
-      buyerAddress: 'Jl. Tebet Barat Dalam No. 8, Jakarta Selatan',
-      buyerCity: 'Jakarta Selatan',
-      distanceKm: 6.5, // < 15 KM (Warning!)
-      price: 250000,
-      status: 'waiting_approval',
-      paymentMethod: 'transfer',
-      createdAt: '15 menit lalu',
-    },
-  ]);
+  const [localOrders, setLocalOrders] = useState<RecipeOrder[]>([]);
 
   const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const parsed = parseRupiahInput(e.target.value);
@@ -135,25 +87,39 @@ export const SellerFlow: React.FC<SellerFlowProps> = ({
 
   const { fee: adminFee, sellerNet } = calculateCommission(price);
 
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setPhotoUrl(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmitToAdmin = () => {
     const newRecipe: Recipe = {
       id: `rcp_custom_${Date.now()}`,
       sellerId: 'user_current',
-      sellerName: sellerOwnerName || 'Pemilik Warung',
-      sellerWarung: sellerWarungName || 'Warung Berkah UMKM',
-      sellerPhone: sellerPhone || '0812-3456-7890',
-      sellerAddress: warungAddress,
-      city,
-      title: title.trim() || 'Resep Usaha Rahasia Terbukti Laris',
+      sellerName: sellerOwnerName || 'Pemilik Usaha',
+      sellerWarung: sellerWarungName || 'Usaha UMKM',
+      sellerPhone: sellerPhone || '',
+      sellerAddress: warungAddress.trim(),
+      city: city.trim() || 'Indonesia',
+      title: title.trim() || 'Resep Usaha Rahasia',
       category,
-      price: price || 250000,
+      price: price || 0,
       photoUrl,
       omzetDescription:
         omzetDesc.trim() ||
-        `Laku ${portionPerDay} porsi/hari. Omzet harian rata-rata Rp 1.500.000 - Rp 2.500.000.`,
+        (portionPerDay > 0
+          ? `Terjual ${portionPerDay} porsi/hari.`
+          : 'Resep racikan usaha UMKM.'),
       portionPerDay,
       rating: 5.0,
-      reviewCount: 1,
+      reviewCount: 0,
       ingredients: ingredientsText
         .split('\n')
         .filter((l) => l.trim())
@@ -174,7 +140,7 @@ export const SellerFlow: React.FC<SellerFlowProps> = ({
     setCurrentStep('step5_dashboard');
   };
 
-  const displayedOrders = externalOrders ?? simulatedOrders;
+  const displayedOrders = externalOrders ?? localOrders;
 
   const handleOrderDecision = (orderId: string, decision: 'approve' | 'reject') => {
     const mappedStatus = decision === 'approve' ? 'approved' : 'rejected';
@@ -182,19 +148,17 @@ export const SellerFlow: React.FC<SellerFlowProps> = ({
       onOrderDecision(orderId, mappedStatus);
       return;
     }
-    setSimulatedOrders((prev) =>
+    setLocalOrders((prev) =>
       prev.map((ord) => {
-        if (ord.id === orderId) {
-          return {
-            ...ord,
-            status: mappedStatus,
-            rejectionReason:
-              decision === 'reject'
-                ? 'Jarak pembeli terlalu dekat (< 15 KM) dari warung penjual demi menjaga proteksi radius usaha.'
-                : undefined,
-          };
-        }
-        return ord;
+        if (ord.id !== orderId) return ord;
+        return {
+          ...ord,
+          status: mappedStatus,
+          rejectionReason:
+            decision === 'reject'
+              ? 'Jarak pembeli terlalu dekat (< 15 KM) dari warung penjual demi menjaga proteksi radius usaha.'
+              : undefined,
+        };
       })
     );
   };
@@ -474,47 +438,40 @@ export const SellerFlow: React.FC<SellerFlowProps> = ({
               Foto Asli Jualan Warung
             </label>
             <div className="flex items-center gap-3">
-              <img
-                src={photoUrl}
-                alt="Foto Resep"
-                className="w-20 h-20 rounded-xl object-cover border border-slate-200 shadow-2xs shrink-0"
-              />
-              <div className="text-xs text-slate-500 space-y-1.5 flex-1">
-                <p className="font-medium text-slate-700">Foto asli makanan yang dijual</p>
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPhotoUrl(
-                        'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=900&q=80'
-                      )
-                    }
-                    className="px-2.5 py-1 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
-                  >
-                    Foto Ayam
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPhotoUrl(
-                        'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=900&q=80'
-                      )
-                    }
-                    className="px-2.5 py-1 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
-                  >
-                    Foto Bakso
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPhotoUrl(
-                        'https://images.unsplash.com/photo-1588166524941-3bf61a9c41db?auto=format&fit=crop&w=900&q=80'
-                      )
-                    }
-                    className="px-2.5 py-1 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
-                  >
-                    Foto Sambal
-                  </button>
+              {photoUrl ? (
+                <img
+                  src={photoUrl}
+                  alt="Foto Resep"
+                  className="w-20 h-20 rounded-xl object-cover border border-slate-200 shadow-2xs shrink-0"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center text-slate-400 shrink-0">
+                  <ChefHat className="w-6 h-6" />
+                  <span className="text-[10px] font-semibold mt-0.5">Belum ada</span>
+                </div>
+              )}
+              <div className="text-xs text-slate-500 space-y-2 flex-1">
+                <p className="font-medium text-slate-700">Unggah foto asli makanan yang dijual</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="px-3 py-1.5 rounded-lg border border-teal-200 bg-teal-50 hover:bg-teal-100 text-[11px] font-bold text-teal-800 inline-flex items-center gap-1.5 cursor-pointer transition-colors">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Pilih Foto dari Perangkat</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  {photoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setPhotoUrl('')}
+                      className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-500 hover:bg-slate-50 cursor-pointer"
+                    >
+                      Hapus Foto
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -680,9 +637,11 @@ export const SellerFlow: React.FC<SellerFlowProps> = ({
                 <Store className="w-4 h-4" />
               </div>
               <p className="text-xs font-bold text-slate-800 mt-1">
-                {sellerWarungName || 'Warung Berkah'}
+                {sellerWarungName || 'Usaha Anda'}
               </p>
-              <p className="text-[11px] text-slate-500">{warungAddress}, {city}</p>
+              <p className="text-[11px] text-slate-500">
+                {warungAddress || 'Alamat belum diisi'}{city ? `, ${city}` : ''}
+              </p>
 
               {/* Protective circular radar */}
               <div className="absolute inset-0 border-2 border-teal-500/30 rounded-lg pointer-events-none" />
@@ -727,14 +686,22 @@ export const SellerFlow: React.FC<SellerFlowProps> = ({
           {/* Summary Preview Box */}
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3 text-xs">
             <div className="flex items-center gap-3">
-              <img
-                src={photoUrl}
-                alt={title}
-                className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-300"
-              />
+              {photoUrl ? (
+                <img
+                  src={photoUrl}
+                  alt={title || 'Foto Resep'}
+                  className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-300"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-600 shrink-0">
+                  <ChefHat className="w-7 h-7" />
+                </div>
+              )}
               <div>
                 <h4 className="font-bold text-slate-800 text-sm">{title || 'Resep Usaha Rahasia'}</h4>
-                <p className="text-slate-500 text-[11px] mt-0.5">Warung: {sellerWarungName || 'Warung Berkah'} • {city}</p>
+                <p className="text-slate-500 text-[11px] mt-0.5">
+                  Usaha: {sellerWarungName || 'Usaha Anda'}{city ? ` • ${city}` : ''}
+                </p>
                 <span className="inline-block px-2 py-0.5 rounded bg-teal-100 text-teal-800 font-bold text-[10px] mt-1">
                   {category}
                 </span>
@@ -807,20 +774,25 @@ export const SellerFlow: React.FC<SellerFlowProps> = ({
             </div>
           </div>
 
-          {/* Simulasi Permintaan Beli Masuk */}
+          {/* Permintaan Beli Masuk */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h4 className="font-bold text-slate-800 text-sm sm:text-base flex items-center gap-2">
                   <ShieldCheck className="w-5 h-5 text-teal-600" />
-                  <span>Simulasi: Permintaan Beli Masuk (Proteksi 15 KM)</span>
+                  <span>Permintaan Beli Masuk (Proteksi 15 KM)</span>
                 </h4>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Di bawah ini adalah contoh calon pembeli yang ingin membeli resep Anda. Anda bebas menyetujui (ACC) atau menolak.
+                  Daftar calon pembeli yang mengajukan pembelian resep Anda akan tampil di sini untuk di-ACC atau ditolak.
                 </p>
               </div>
             </div>
 
+            {displayedOrders.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-slate-100">
+                Belum ada permintaan beli masuk saat ini.
+              </div>
+            ) : (
             <div className="space-y-3">
               {displayedOrders.map((ord) => {
                 const isUnder15Km = ord.distanceKm < 15;
@@ -924,6 +896,7 @@ export const SellerFlow: React.FC<SellerFlowProps> = ({
                 );
               })}
             </div>
+            )}
           </div>
 
           {/* Button to go back */}

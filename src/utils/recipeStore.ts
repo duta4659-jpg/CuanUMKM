@@ -1,127 +1,33 @@
 import type { Recipe, RecipeOrder } from '../types/recipe';
-import { INITIAL_RECIPES } from '../data/sampleRecipes';
 
 export const RECIPES_STORAGE_KEY = 'cuanumkm_recipes_v1';
 export const RECIPE_ORDERS_STORAGE_KEY = 'cuanumkm_recipe_orders_v1';
 export const ADMIN_PIN_STORAGE_KEY = 'cuanumkm_admin_pin_v1';
 export const DEFAULT_ADMIN_PIN = '1234';
 
-export const INITIAL_RECIPE_ORDERS: RecipeOrder[] = [
-  {
-    id: 'ord_adm_1',
-    recipeId: 'rcp_1',
-    recipeTitle: 'Ayam Goreng Lengkuas Rempah Basah Renyah',
-    recipePhoto:
-      'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=900&q=80',
-    sellerName: 'Bu Siti Rahayu',
-    sellerWarung: 'Warung Berkah Nasi Ayam',
-    sellerPhone: '0812-3456-7890',
-    sellerCity: 'Jakarta Selatan',
-    buyerName: 'Ibu Ratna Dewi',
-    buyerPhone: '0857-4433-2211',
-    buyerAddress: 'Jl. Tebet Barat Dalam No. 8, Tebet',
-    buyerCity: 'Jakarta Selatan',
-    distanceKm: 6.5,
-    price: 250000,
-    status: 'waiting_approval',
-    paymentMethod: 'transfer',
-    createdAt: '10 menit lalu',
-  },
-  {
-    id: 'ord_adm_2',
-    recipeId: 'rcp_1',
-    recipeTitle: 'Ayam Goreng Lengkuas Rempah Basah Renyah',
-    recipePhoto:
-      'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=900&q=80',
-    sellerName: 'Bu Siti Rahayu',
-    sellerWarung: 'Warung Berkah Nasi Ayam',
-    sellerPhone: '0812-3456-7890',
-    sellerCity: 'Jakarta Selatan',
-    buyerName: 'Mas Hendra Wijaya',
-    buyerPhone: '0812-9090-1122',
-    buyerAddress: 'Jl. Raya Pasar Minggu Gg. Melati No. 3',
-    buyerCity: 'Jakarta Selatan',
-    distanceKm: 0.85,
-    price: 250000,
-    status: 'waiting_approval',
-    paymentMethod: 'qris',
-    createdAt: '22 menit lalu',
-  },
-  {
-    id: 'ord_adm_3',
-    recipeId: 'rcp_1',
-    recipeTitle: 'Ayam Goreng Lengkuas Rempah Basah Renyah',
-    recipePhoto:
-      'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=900&q=80',
-    sellerName: 'Bu Siti Rahayu',
-    sellerWarung: 'Warung Berkah Nasi Ayam',
-    sellerPhone: '0812-3456-7890',
-    sellerCity: 'Jakarta Selatan',
-    buyerName: 'Pak Joko Santoso',
-    buyerPhone: '0813-7766-5544',
-    buyerAddress: 'Jl. Riau No. 18, Citarum',
-    buyerCity: 'Bandung',
-    distanceKm: 142,
-    price: 250000,
-    status: 'waiting_approval',
-    paymentMethod: 'qris',
-    createdAt: '1 jam lalu',
-  },
-  {
-    id: 'ord_adm_4',
-    recipeId: 'rcp_2',
-    recipeTitle: 'Kuah Bakso Sapi Bening Gurih Kaldu Sumsum Asli',
-    recipePhoto:
-      'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=900&q=80',
-    sellerName: 'Cak Hadi Pranoto',
-    sellerWarung: 'Bakso Sapi Asli Wonogiri Cak Hadi',
-    sellerPhone: '0813-8899-7711',
-    sellerCity: 'Malang',
-    buyerName: 'Mbak Sari Lestari',
-    buyerPhone: '0856-3322-8899',
-    buyerAddress: 'Jl. Malioboro No. 40, Danurejan',
-    buyerCity: 'Yogyakarta',
-    distanceKm: 325,
-    price: 350000,
-    status: 'waiting_approval',
-    paymentMethod: 'transfer',
-    createdAt: '2 jam lalu',
-  },
-  {
-    id: 'ord_adm_5',
-    recipeId: 'rcp_1',
-    recipeTitle: 'Ayam Goreng Lengkuas Rempah Basah Renyah',
-    recipePhoto:
-      'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=900&q=80',
-    sellerName: 'Bu Siti Rahayu',
-    sellerWarung: 'Warung Berkah Nasi Ayam',
-    sellerPhone: '0812-3456-7890',
-    sellerCity: 'Jakarta Selatan',
-    buyerName: 'Pak Ahmad Fauzi',
-    buyerPhone: '0811-2233-4455',
-    buyerAddress: 'Jl. Diponegoro No. 14, Tembalang',
-    buyerCity: 'Semarang',
-    distanceKm: 440,
-    price: 250000,
-    status: 'approved',
-    paymentMethod: 'qris',
-    createdAt: 'Kemarin',
-  },
-];
+const LEGACY_DEMO_RECIPE_IDS = new Set(['rcp_1', 'rcp_2', 'rcp_3', 'rcp_4', 'rcp_5']);
+
+export const INITIAL_RECIPE_ORDERS: RecipeOrder[] = [];
 
 export function loadRecipesFromStorage(): Recipe[] {
   try {
     const raw = localStorage.getItem(RECIPES_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+      if (Array.isArray(parsed)) {
+        const cleaned = parsed.filter(
+          (r: Recipe) => r && typeof r.id === 'string' && !LEGACY_DEMO_RECIPE_IDS.has(r.id)
+        );
+        if (cleaned.length !== parsed.length) {
+          saveRecipesToStorage(cleaned);
+        }
+        return cleaned;
       }
     }
   } catch (e) {
     console.error('Failed to load recipes:', e);
   }
-  return INITIAL_RECIPES;
+  return [];
 }
 
 export function saveRecipesToStorage(recipes: Recipe[]): void {
@@ -137,14 +43,24 @@ export function loadRecipeOrdersFromStorage(): RecipeOrder[] {
     const raw = localStorage.getItem(RECIPE_ORDERS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+      if (Array.isArray(parsed)) {
+        const cleaned = parsed.filter(
+          (o: RecipeOrder) =>
+            o &&
+            typeof o.id === 'string' &&
+            !o.id.startsWith('ord_adm_') &&
+            !o.id.startsWith('ord_demo_')
+        );
+        if (cleaned.length !== parsed.length) {
+          saveRecipeOrdersToStorage(cleaned);
+        }
+        return cleaned;
       }
     }
   } catch (e) {
     console.error('Failed to load recipe orders:', e);
   }
-  return INITIAL_RECIPE_ORDERS;
+  return [];
 }
 
 export function saveRecipeOrdersToStorage(orders: RecipeOrder[]): void {

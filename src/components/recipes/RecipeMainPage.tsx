@@ -90,9 +90,9 @@ export const RecipeMainPage: React.FC<RecipeMainPageProps> = ({
       <BuyerFlow
         onBack={() => setView('hub')}
         recipes={recipeList}
-        buyerDefaultName={sellerOwnerName || 'Pak Budi'}
-        buyerDefaultPhone={sellerPhone || '0812-3456-7890'}
-        buyerDefaultAddress={sellerAddress || 'Jl. Cisangkuy No. 25'}
+        buyerDefaultName={sellerOwnerName || ''}
+        buyerDefaultPhone={sellerPhone || ''}
+        buyerDefaultAddress={sellerAddress || ''}
         orders={orders}
         onCreateOrder={onCreateOrder}
         onOrderDecision={onOrderDecision}

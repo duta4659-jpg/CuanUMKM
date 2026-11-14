@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   FileJson,
   Upload,
-  RefreshCw,
   Lightbulb,
   Bell,
   Coins,
@@ -48,7 +47,6 @@ interface ProfilePageProps {
   onLogout: () => void;
   transactions: Transaction[];
   onRestoreTransactions: (imported: Transaction[]) => void;
-  onResetDemo: () => void;
   isFirebaseConnected: boolean;
   recipeOrders?: RecipeOrder[];
   onOrderDecision?: (orderId: string, decision: 'approved' | 'rejected') => void;
@@ -62,7 +60,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   onLogout,
   transactions,
   onRestoreTransactions,
-  onResetDemo,
   recipeOrders,
   onOrderDecision,
 }) => {
@@ -147,8 +144,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       setIsSaving(true);
       await onSaveProfile({
         ...profile,
-        businessName: businessName.trim() || 'Warung Berkah UMKM',
-        ownerName: ownerName.trim() || 'Pemilik Warung',
+        businessName: businessName.trim() || 'Usaha UMKM',
+        ownerName: ownerName.trim() || 'Pemilik Usaha',
         phone: phone.trim(),
         address: address.trim(),
         initialCash,
@@ -252,14 +249,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <div className="w-14 h-14 rounded-2xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700 font-extrabold text-2xl shrink-0">
-              {ownerName ? ownerName.charAt(0).toUpperCase() : 'W'}
+              {ownerName
+                ? ownerName.charAt(0).toUpperCase()
+                : businessName
+                ? businessName.charAt(0).toUpperCase()
+                : 'U'}
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-800">
-                {businessName || 'Warung Berkah UMKM'}
+                {businessName || 'Usaha UMKM Anda'}
               </h2>
               <p className="text-xs text-slate-500 font-medium">
-                Pemilik: {ownerName || 'Pengusaha UMKM'}
+                Pemilik: {ownerName || 'Belum diisi'}
               </p>
               <div className="flex items-center gap-1 text-[11px] text-teal-700 font-semibold mt-1">
                 <Store className="w-3.5 h-3.5" />
@@ -941,21 +942,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               className="hidden"
             />
           </label>
-        </div>
-
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={() => {
-              if (confirm('Ingin mereset transaksi ke data demo contoh warung?')) {
-                onResetDemo();
-              }
-            }}
-            className="text-xs text-slate-400 hover:text-slate-600 font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Muat Ulang Transaksi Contoh (Demo)</span>
-          </button>
         </div>
       </div>
 

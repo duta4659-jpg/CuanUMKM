@@ -68,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <p className="text-xs text-slate-500 font-medium truncate max-w-[180px] sm:max-w-xs flex items-center gap-1 mt-0.5">
               <Store className="w-3 h-3 text-teal-600 inline shrink-0" />
-              <span>{businessName || 'Warung Berkah UMKM'}</span>
+              <span>{businessName || 'Usaha UMKM Anda'}</span>
             </p>
           </div>
         </div>
