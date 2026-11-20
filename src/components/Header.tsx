@@ -1,6 +1,8 @@
 import React, { useRef } from 'react';
-import { Store, Cloud, CloudOff, LogIn, LogOut } from 'lucide-react';
+import { Store, Cloud, CloudOff, LogIn, LogOut, WifiOff } from 'lucide-react';
 import type { AuthUser } from '../types';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   businessName: string;
@@ -19,6 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
   isFirebaseConnected,
   onSecretLogoTap,
 }) => {
+  const isOnline = useOnlineStatus();
   const tapCountRef = useRef<number>(0);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -46,18 +49,18 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-teal-100 shadow-xs">
-      <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
         {/* Brand & Store Name */}
         <div
           onClick={handleLogoTap}
-          className="flex items-center gap-3 select-none cursor-pointer"
+          className="flex items-center gap-3 select-none cursor-pointer min-w-0"
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-teal-500 text-white flex items-center justify-center shadow-md shadow-teal-600/20">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-teal-500 text-white flex items-center justify-center shadow-md shadow-teal-600/20 shrink-0">
             <span className="font-extrabold text-xl tracking-tight text-white flex items-center">
               C<span className="text-orange-300">$</span>
             </span>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-slate-800 tracking-tight leading-none">
                 Cuan<span className="text-orange-500">UMKM</span>
@@ -66,35 +69,46 @@ export const Header: React.FC<HeaderProps> = ({
                 Warung
               </span>
             </div>
-            <p className="text-xs text-slate-500 font-medium truncate max-w-[180px] sm:max-w-xs flex items-center gap-1 mt-0.5">
+            <p className="text-xs text-slate-500 font-medium truncate max-w-[160px] sm:max-w-xs flex items-center gap-1 mt-0.5">
               <Store className="w-3 h-3 text-teal-600 inline shrink-0" />
-              <span>{businessName || 'Usaha UMKM Anda'}</span>
+              <span className="truncate">{businessName || 'Usaha UMKM Anda'}</span>
             </p>
           </div>
         </div>
 
-        {/* Firebase & Account Status */}
-        <div className="flex items-center gap-2">
-          {/* Cloud Sync Indicator */}
+        {/* PWA Install, Sync & Account Status */}
+        <div className="flex items-center gap-2 shrink-0">
+          <PWAInstallButton variant="compact" />
+
+          {/* Cloud / Offline Sync Indicator */}
           <div
             className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
-              isFirebaseConnected
+              !isOnline
+                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                : isFirebaseConnected
                 ? 'bg-teal-50 text-teal-700 border-teal-200'
                 : user
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                 : 'bg-amber-50 text-amber-700 border-amber-200'
             }`}
             title={
-              isFirebaseConnected
+              !isOnline
+                ? 'Mode Offline — Data tersimpan aman di perangkat'
+                : isFirebaseConnected
                 ? 'Terhubung aman ke Firebase Cloud Firestore'
                 : user
                 ? 'Akun usaha aktif'
                 : 'Mode Tamu — Catatan tersimpan di perangkat ini'
             }
           >
-            {isFirebaseConnected ? (
+            {!isOnline ? (
               <>
-                <Cloud className="w-3.5 h-3.5 text-teal-600 animate-pulse" />
+                <WifiOff className="w-3.5 h-3.5 text-amber-700" />
+                <span>Offline</span>
+              </>
+            ) : isFirebaseConnected ? (
+              <>
+                <Cloud className="w-3.5 h-3.5 text-teal-600" />
                 <span>Firebase Aktif</span>
               </>
             ) : user ? (

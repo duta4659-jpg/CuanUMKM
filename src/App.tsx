@@ -38,10 +38,13 @@ import { RecipeFeatureCard } from './components/recipes/RecipeFeatureCard';
 import { RecipeMainPage } from './components/recipes/RecipeMainPage';
 import { AdminPasswordModal } from './components/admin/AdminPasswordModal';
 import { AdminPanelPage } from './components/admin/AdminPanelPage';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { Plus, CheckCircle2, AlertCircle } from 'lucide-react';
 
 const LOCAL_STORAGE_TX_KEY = 'cuanumkm_transactions_v1';
 const LOCAL_STORAGE_PROFILE_KEY = 'cuanumkm_profile_v1';
+const LOCAL_STORAGE_PENDING_DELETES_KEY = 'cuanumkm_pending_deletes_v1';
+const LOCAL_STORAGE_PENDING_SYNC_KEY = 'cuanumkm_pending_sync_v1';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -135,66 +138,127 @@ export default function App() {
     }
   }, []);
 
-  // 2. Listen to Firebase Auth state
+  // 2. Listen to Firebase Auth state & sync when online
   useEffect(() => {
+    let unsubscribeTx: (() => void) | null = null;
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (unsubscribeTx) {
+        unsubscribeTx();
+        unsubscribeTx = null;
+      }
+
       if (user) {
         setCurrentUser(user);
-        setIsFirebaseConnected(true);
+        const onlineNow = typeof navigator === 'undefined' ? true : navigator.onLine;
+        setIsFirebaseConnected(onlineNow);
 
-        // Fetch cloud user profile if exists
-        try {
-          const cloudProfile = await fetchUserProfile(user.uid);
-          if (cloudProfile) {
-            setProfile(cloudProfile);
-            localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(cloudProfile));
-          } else {
-            // First time login: initialize user profile in Firestore
-            const newProfile: UserProfile = {
-              ...profile,
-              userId: user.uid,
-              ownerName: user.displayName || profile.ownerName,
-            };
-            await saveUserProfile(newProfile);
-            setProfile(newProfile);
-          }
-        } catch (err) {
-          console.error('Error syncing profile with Firestore:', err);
-        }
-
-        // Subscribe to user transactions in Firestore
-        const unsubscribeTx = subscribeToTransactions(
-          user.uid,
-          (cloudTransactions) => {
-            if (cloudTransactions && cloudTransactions.length > 0) {
-              setTransactions(cloudTransactions);
-              localStorage.setItem(LOCAL_STORAGE_TX_KEY, JSON.stringify(cloudTransactions));
-            } else if (transactions.length > 0) {
-              // Upload any real local transactions created before sign-in
-              transactions.forEach((tx) => {
-                saveTransaction({
-                  ...tx,
-                  userId: user.uid,
-                }).catch(console.error);
-              });
+        if (onlineNow) {
+          // Fetch cloud user profile if exists
+          try {
+            const cloudProfile = await fetchUserProfile(user.uid);
+            if (cloudProfile) {
+              setProfile(cloudProfile);
+              localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(cloudProfile));
+            } else {
+              const newProfile: UserProfile = {
+                ...profile,
+                userId: user.uid,
+                ownerName: user.displayName || profile.ownerName,
+              };
+              await saveUserProfile(newProfile);
+              setProfile(newProfile);
             }
-          },
-          (err) => {
-            console.warn('Realtime listener error, fallback to local', err);
+          } catch (err) {
+            console.warn('Offline or profile sync skipped, using local storage:', err);
           }
-        );
 
-        return () => {
-          unsubscribeTx();
-        };
+          // Subscribe to user transactions in Firestore
+          unsubscribeTx = subscribeToTransactions(
+            user.uid,
+            (cloudTransactions) => {
+              if (cloudTransactions && cloudTransactions.length > 0) {
+                setTransactions(cloudTransactions);
+                localStorage.setItem(LOCAL_STORAGE_TX_KEY, JSON.stringify(cloudTransactions));
+              } else if (transactions.length > 0) {
+                transactions.forEach((tx) => {
+                  saveTransaction({
+                    ...tx,
+                    userId: user.uid,
+                  }).catch(console.warn);
+                });
+              }
+            },
+            (err) => {
+              console.warn('Realtime listener offline/error, using local data:', err);
+            }
+          );
+        }
       } else {
         setCurrentUser(null);
         setIsFirebaseConnected(false);
       }
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      if (unsubscribeTx) {
+        unsubscribeTx();
+      }
+      unsubscribeAuth();
+    };
   }, [profile.businessName, profile.ownerName]);
+
+  // 2b. Re-sync queued offline changes automatically when connection returns
+  useEffect(() => {
+    const syncPendingData = async () => {
+      setIsFirebaseConnected(Boolean(currentUser) && navigator.onLine);
+      if (!currentUser || !navigator.onLine) return;
+
+      try {
+        const pendingDeletesRaw = localStorage.getItem(LOCAL_STORAGE_PENDING_DELETES_KEY);
+        const pendingDeletes: string[] = pendingDeletesRaw ? JSON.parse(pendingDeletesRaw) : [];
+        if (pendingDeletes.length > 0) {
+          await Promise.all(pendingDeletes.map((id) => removeTransaction(id)));
+          localStorage.removeItem(LOCAL_STORAGE_PENDING_DELETES_KEY);
+        }
+
+        const hasPendingSync = localStorage.getItem(LOCAL_STORAGE_PENDING_SYNC_KEY) === 'true';
+        if (hasPendingSync) {
+          const savedTxRaw = localStorage.getItem(LOCAL_STORAGE_TX_KEY);
+          const localTxList: Transaction[] = savedTxRaw ? JSON.parse(savedTxRaw) : [];
+          await Promise.all(
+            localTxList.map((tx) => saveTransaction({ ...tx, userId: currentUser.uid }))
+          );
+
+          const savedProfileRaw = localStorage.getItem(LOCAL_STORAGE_PROFILE_KEY);
+          if (savedProfileRaw) {
+            const localProfile = JSON.parse(savedProfileRaw) as UserProfile;
+            await saveUserProfile({ ...localProfile, userId: currentUser.uid });
+          }
+
+          localStorage.removeItem(LOCAL_STORAGE_PENDING_SYNC_KEY);
+          showToast('Koneksi kembali! Catatan offline berhasil disinkronkan.');
+        }
+      } catch (err) {
+        console.warn('Pending offline sync postponed:', err);
+      }
+    };
+
+    const handleOffline = () => {
+      setIsFirebaseConnected(false);
+    };
+
+    window.addEventListener('online', syncPendingData);
+    window.addEventListener('offline', handleOffline);
+    if (navigator.onLine && currentUser) {
+      syncPendingData();
+    }
+
+    return () => {
+      window.removeEventListener('online', syncPendingData);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [currentUser, showToast]);
 
   // Auth modal helpers & access gates
   const openAuthModal = useCallback((gateMsg?: string, onSuccess?: () => void) => {
@@ -367,7 +431,7 @@ export default function App() {
       updatedAt: new Date().toISOString(),
     };
 
-    // Update local state immediately for snappy UX
+    // Update local state immediately for snappy offline-first UX
     setTransactions((prev) => {
       const exists = prev.some((t) => t.id === txId);
       const updated = exists ? prev.map((t) => (t.id === txId ? newTx : t)) : [newTx, ...prev];
@@ -375,16 +439,28 @@ export default function App() {
       return updated;
     });
 
-    // If Firebase user is connected, persist to Firestore
+    const isOnlineNow = typeof navigator === 'undefined' ? true : navigator.onLine;
+
     if (currentUser) {
-      await saveTransaction({
-        ...newTx,
-        userId: currentUser.uid,
-      });
+      if (isOnlineNow) {
+        try {
+          await saveTransaction({
+            ...newTx,
+            userId: currentUser.uid,
+          });
+        } catch (err) {
+          console.warn('Cloud sync deferred, saved locally:', err);
+          localStorage.setItem(LOCAL_STORAGE_PENDING_SYNC_KEY, 'true');
+        }
+      } else {
+        localStorage.setItem(LOCAL_STORAGE_PENDING_SYNC_KEY, 'true');
+      }
     }
 
     showToast(
-      txData.id
+      !isOnlineNow
+        ? `${txData.id ? 'Perubahan' : txData.type === 'income' ? 'Pemasukan' : 'Pengeluaran'} tersimpan di perangkat (Offline)`
+        : txData.id
         ? 'Transaksi berhasil diperbarui!'
         : `${txData.type === 'income' ? 'Pemasukan' : 'Pengeluaran'} berhasil dicatat!`
     );
@@ -398,11 +474,33 @@ export default function App() {
       return updated;
     });
 
+    const isOnlineNow = typeof navigator === 'undefined' ? true : navigator.onLine;
     if (currentUser) {
-      await removeTransaction(id);
+      if (isOnlineNow) {
+        try {
+          await removeTransaction(id);
+        } catch (err) {
+          console.warn('Cloud delete deferred, removed locally:', err);
+          const pendingRaw = localStorage.getItem(LOCAL_STORAGE_PENDING_DELETES_KEY);
+          const pending: string[] = pendingRaw ? JSON.parse(pendingRaw) : [];
+          if (!pending.includes(id)) {
+            localStorage.setItem(LOCAL_STORAGE_PENDING_DELETES_KEY, JSON.stringify([...pending, id]));
+          }
+        }
+      } else {
+        const pendingRaw = localStorage.getItem(LOCAL_STORAGE_PENDING_DELETES_KEY);
+        const pending: string[] = pendingRaw ? JSON.parse(pendingRaw) : [];
+        if (!pending.includes(id)) {
+          localStorage.setItem(LOCAL_STORAGE_PENDING_DELETES_KEY, JSON.stringify([...pending, id]));
+        }
+      }
     }
 
-    showToast('Catatan transaksi telah dihapus');
+    showToast(
+      !isOnlineNow
+        ? 'Catatan dihapus dari perangkat (Offline)'
+        : 'Catatan transaksi telah dihapus'
+    );
   };
 
   // Save User Profile
@@ -410,13 +508,27 @@ export default function App() {
     setProfile(updated);
     localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(updated));
 
+    const isOnlineNow = typeof navigator === 'undefined' ? true : navigator.onLine;
     if (currentUser) {
-      await saveUserProfile({
-        ...updated,
-        userId: currentUser.uid,
-      });
+      if (isOnlineNow) {
+        try {
+          await saveUserProfile({
+            ...updated,
+            userId: currentUser.uid,
+          });
+        } catch (err) {
+          console.warn('Profile cloud sync deferred, saved locally:', err);
+          localStorage.setItem(LOCAL_STORAGE_PENDING_SYNC_KEY, 'true');
+        }
+      } else {
+        localStorage.setItem(LOCAL_STORAGE_PENDING_SYNC_KEY, 'true');
+      }
     }
-    showToast('Profil usaha berhasil disimpan');
+    showToast(
+      !isOnlineNow
+        ? 'Profil usaha tersimpan di perangkat (Offline)'
+        : 'Profil usaha berhasil disimpan'
+    );
   };
 
   // Restore Transactions
@@ -485,6 +597,9 @@ export default function App() {
         isFirebaseConnected={isFirebaseConnected}
         onSecretLogoTap={handleSecretLogoTap}
       />
+
+      {/* Offline status notice when network is unavailable */}
+      <OfflineIndicator />
 
       {/* Main Container (generous bottom clearance for floating dock & future banner space) */}
       <main className="max-w-4xl mx-auto w-full px-4 pt-4 pb-40 sm:pb-44 flex-1">

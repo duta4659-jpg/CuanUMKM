@@ -28,6 +28,7 @@ import type { UserProfile, Transaction, AuthUser } from '../types';
 import type { RecipeOrder } from '../types/recipe';
 import { formatRupiah, parseRupiahInput } from '../utils/formatters';
 import { loadRecipeOrdersFromStorage, formatDistanceDetail } from '../utils/recipeStore';
+import { PWAInstallButton } from './PWAInstallButton';
 
 const WITHDRAWALS_STORAGE_KEY = 'cuanumkm_recipe_withdrawals_v1';
 
@@ -305,6 +306,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 1.5 Kartu Instalasi PWA (otomatis hilang jika sudah terpasang) */}
+      <PWAInstallButton variant="card" />
 
       {/* 2. Tiga Tombol Menu Utama Ringkas di Profil */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

@@ -416,7 +416,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
               }`}
             >
               {isSubmitting ? (
-                <span>Menyimpan ke Firebase...</span>
+                <span>Menyimpan...</span>
               ) : (
                 <>
                   <Check className="w-5 h-5 stroke-[3]" />

@@ -65,6 +65,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleGoogleLogin = async () => {
     setErrorMsg('');
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setErrorMsg(
+        'Sedang dalam mode offline. Masuk dengan Google membutuhkan internet, atau gunakan akun manual lokal.'
+      );
+      return;
+    }
     setIsLoading(true);
     try {
       const fbUser = await loginWithGoogle();
@@ -79,7 +85,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onClose();
     } catch (err: any) {
       if (err?.code !== 'auth/popup-closed-by-user') {
-        setErrorMsg('Gagal masuk dengan Google. Silakan coba lagi atau daftar manual di bawah.');
+        setErrorMsg(
+          err?.message ||
+            'Gagal masuk dengan Google. Silakan coba lagi atau daftar manual di bawah.'
+        );
       }
     } finally {
       setIsLoading(false);

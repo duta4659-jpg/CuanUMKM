@@ -148,14 +148,37 @@ export function handleFirestoreError(
   throw new Error(JSON.stringify(errInfo));
 }
 
+export function isOfflineOrNetworkError(error: unknown): boolean {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return true;
+  }
+  const msg = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error
+      ? String((error as { code?: unknown }).code).toLowerCase()
+      : '';
+  return (
+    code.includes('unavailable') ||
+    code.includes('network-request-failed') ||
+    msg.includes('client is offline') ||
+    msg.includes('failed to get document because the client is offline') ||
+    msg.includes('network error') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('unavailable')
+  );
+}
+
 // Connection test on boot as required by Firebase skill
 export async function testConnection() {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return;
+  }
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
     console.log('Firebase connection tested successfully');
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('Please check your Firebase configuration.');
+    if (!isOfflineOrNetworkError(error)) {
+      console.warn('Firebase connection check notice:', error);
     }
   }
 }
@@ -163,6 +186,9 @@ testConnection();
 
 // Auth helper functions
 export async function loginWithGoogle(): Promise<User> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error('Tidak ada koneksi internet. Masuk dengan Google membutuhkan koneksi internet.');
+  }
   try {
     const result = await signInWithPopup(auth, googleProvider);
     clearManualSession();
@@ -357,6 +383,9 @@ export function subscribeToTransactions(
   onError?: (error: Error) => void
 ): Unsubscribe {
   const path = 'transactions';
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return () => {};
+  }
   try {
     const q = query(collection(db, path), where('userId', '==', userId));
     return onSnapshot(
@@ -384,10 +413,16 @@ export function subscribeToTransactions(
         if (onError) {
           onError(error);
         }
+        if (isOfflineOrNetworkError(error)) {
+          return;
+        }
         handleFirestoreError(error, OperationType.LIST, path);
       }
     );
   } catch (error) {
+    if (isOfflineOrNetworkError(error)) {
+      return () => {};
+    }
     handleFirestoreError(error, OperationType.LIST, path);
   }
 }
@@ -399,6 +434,10 @@ export async function saveTransaction(
   const path = 'transactions';
   const txId = transaction.id || `tx_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const nowIso = new Date().toISOString();
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return txId;
+  }
 
   const payload: Record<string, any> = {
     userId: transaction.userId,
@@ -419,22 +458,34 @@ export async function saveTransaction(
     await setDoc(docRef, payload, { merge: true });
     return txId;
   } catch (error) {
+    if (isOfflineOrNetworkError(error)) {
+      return txId;
+    }
     handleFirestoreError(error, OperationType.WRITE, `${path}/${txId}`);
   }
 }
 
 // Delete transaction from Firestore
 export async function removeTransaction(transactionId: string): Promise<void> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return;
+  }
   const path = `transactions/${transactionId}`;
   try {
     await deleteDoc(doc(db, 'transactions', transactionId));
   } catch (error) {
+    if (isOfflineOrNetworkError(error)) {
+      return;
+    }
     handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
 
 // User Profile helpers
 export async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return null;
+  }
   const path = `users/${userId}`;
   try {
     const snap = await getDoc(doc(db, 'users', userId));
@@ -443,11 +494,17 @@ export async function fetchUserProfile(userId: string): Promise<UserProfile | nu
     }
     return null;
   } catch (error) {
+    if (isOfflineOrNetworkError(error)) {
+      return null;
+    }
     handleFirestoreError(error, OperationType.GET, path);
   }
 }
 
 export async function saveUserProfile(profile: UserProfile): Promise<void> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return;
+  }
   const path = `users/${profile.userId}`;
   const nowIso = new Date().toISOString();
   try {
@@ -460,6 +517,9 @@ export async function saveUserProfile(profile: UserProfile): Promise<void> {
       { merge: true }
     );
   } catch (error) {
+    if (isOfflineOrNetworkError(error)) {
+      return;
+    }
     handleFirestoreError(error, OperationType.WRITE, path);
   }
 }
