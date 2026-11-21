@@ -3,6 +3,7 @@ import { Store, Cloud, CloudOff, LogIn, LogOut, WifiOff } from 'lucide-react';
 import type { AuthUser } from '../types';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { PWAInstallButton } from './PWAInstallButton';
+import { BrandIcon } from './BrandIcon';
 
 interface HeaderProps {
   businessName: string;
@@ -55,10 +56,8 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={handleLogoTap}
           className="flex items-center gap-3 select-none cursor-pointer min-w-0"
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-teal-500 text-white flex items-center justify-center shadow-md shadow-teal-600/20 shrink-0">
-            <span className="font-extrabold text-xl tracking-tight text-white flex items-center">
-              C<span className="text-orange-300">$</span>
-            </span>
+          <div className="w-10 h-10 rounded-xl shadow-md shadow-teal-900/20 shrink-0 overflow-hidden">
+            <BrandIcon className="w-10 h-10" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">

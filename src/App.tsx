@@ -19,7 +19,22 @@ import {
 import type { Transaction, UserProfile, AuthUser } from './types';
 import type { Recipe, RecipeOrder } from './types/recipe';
 import { getTodayDateString } from './utils/formatters';
-import { DEFAULT_PROFILE } from './utils/initialData';
+import {
+  loadLocalTransactions,
+  saveLocalTransactions,
+  loadLocalProfile,
+  saveLocalProfile,
+  sortTransactionsNewestFirst,
+  getPendingUpsertIds,
+  getPendingDeleteIds,
+  markTransactionPendingUpsert,
+  markTransactionSynced,
+  markTransactionPendingDelete,
+  clearPendingDelete,
+  setPendingProfileSync,
+  hasPendingProfileSync,
+  mergeCloudAndLocalTransactions,
+} from './utils/offlineStorage';
 import {
   loadRecipesFromStorage,
   saveRecipesToStorage,
@@ -41,19 +56,26 @@ import { AdminPanelPage } from './components/admin/AdminPanelPage';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { Plus, CheckCircle2, AlertCircle } from 'lucide-react';
 
-const LOCAL_STORAGE_TX_KEY = 'cuanumkm_transactions_v1';
-const LOCAL_STORAGE_PROFILE_KEY = 'cuanumkm_profile_v1';
-const LOCAL_STORAGE_PENDING_DELETES_KEY = 'cuanumkm_pending_deletes_v1';
-const LOCAL_STORAGE_PENDING_SYNC_KEY = 'cuanumkm_pending_sync_v1';
-
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [manualUser, setManualUser] = useState<AuthUser | null>(() => getSavedManualSession());
   const [isFirebaseConnected, setIsFirebaseConnected] = useState<boolean>(false);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
+  const [transactions, setTransactions] = useState<Transaction[]>(() => loadLocalTransactions());
+  const [profile, setProfile] = useState<UserProfile>(() => loadLocalProfile());
   const [currentTab, setCurrentTab] = useState<TabType>('home');
   const [isRecipePageActive, setIsRecipePageActive] = useState<boolean>(false);
+
+  const transactionsRef = useRef<Transaction[]>(transactions);
+  const profileRef = useRef<UserProfile>(profile);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    transactionsRef.current = transactions;
+  }, [transactions]);
+
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -90,55 +112,18 @@ export default function App() {
   }, [currentUser, manualUser, profile.ownerName, profile.businessName]);
 
   const showToast = useCallback((msg: string, variant: 'success' | 'error' = 'success') => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
     setToastVariant(variant);
     setToastMessage(msg);
-    setTimeout(() => {
+    toastTimerRef.current = setTimeout(() => {
       setToastMessage(null);
+      toastTimerRef.current = null;
     }, 3200);
   }, []);
 
-  // 1. Initial Load: Load profile & transactions from LocalStorage (clean start for new users)
-  useEffect(() => {
-    try {
-      const savedProfile = localStorage.getItem(LOCAL_STORAGE_PROFILE_KEY);
-      if (savedProfile) {
-        const parsedProfile = JSON.parse(savedProfile) as UserProfile;
-        const isLegacyDemoProfile =
-          parsedProfile.businessName === 'Warung Berkah UMKM' &&
-          parsedProfile.ownerName === 'Bu Siti Rahayu' &&
-          parsedProfile.phone === '0812-3456-7890' &&
-          parsedProfile.initialCash === 500000;
-        if (isLegacyDemoProfile) {
-          localStorage.removeItem(LOCAL_STORAGE_PROFILE_KEY);
-          setProfile(DEFAULT_PROFILE);
-        } else {
-          setProfile(parsedProfile);
-        }
-      }
-
-      const savedTx = localStorage.getItem(LOCAL_STORAGE_TX_KEY);
-      if (savedTx) {
-        const parsedTx = JSON.parse(savedTx);
-        if (Array.isArray(parsedTx)) {
-          const cleanedTx = parsedTx.filter(
-            (tx: Transaction) => tx && typeof tx.id === 'string' && !tx.id.startsWith('tx_init_')
-          );
-          if (cleanedTx.length !== parsedTx.length) {
-            localStorage.setItem(LOCAL_STORAGE_TX_KEY, JSON.stringify(cleanedTx));
-          }
-          setTransactions(cleanedTx);
-        } else {
-          setTransactions([]);
-        }
-      } else {
-        setTransactions([]);
-      }
-    } catch (e) {
-      console.error('Failed to load local data', e);
-    }
-  }, []);
-
-  // 2. Listen to Firebase Auth state & sync when online
+  // 1. Listen to Firebase Auth state & sync safely when online
   useEffect(() => {
     let unsubscribeTx: (() => void) | null = null;
 
@@ -154,39 +139,54 @@ export default function App() {
         setIsFirebaseConnected(onlineNow);
 
         if (onlineNow) {
-          // Fetch cloud user profile if exists
+          // Sync user profile safely without clobbering pending offline edits
           try {
-            const cloudProfile = await fetchUserProfile(user.uid);
-            if (cloudProfile) {
-              setProfile(cloudProfile);
-              localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(cloudProfile));
+            if (hasPendingProfileSync()) {
+              const localProf = { ...profileRef.current, userId: user.uid };
+              await saveUserProfile(localProf);
+              setPendingProfileSync(false);
             } else {
-              const newProfile: UserProfile = {
-                ...profile,
-                userId: user.uid,
-                ownerName: user.displayName || profile.ownerName,
-              };
-              await saveUserProfile(newProfile);
-              setProfile(newProfile);
+              const cloudProfile = await fetchUserProfile(user.uid);
+              if (cloudProfile) {
+                setProfile(cloudProfile);
+                saveLocalProfile(cloudProfile);
+              } else {
+                const newProfile: UserProfile = {
+                  ...profileRef.current,
+                  userId: user.uid,
+                  ownerName: user.displayName || profileRef.current.ownerName,
+                };
+                await saveUserProfile(newProfile);
+                setProfile(newProfile);
+                saveLocalProfile(newProfile);
+              }
             }
           } catch (err) {
             console.warn('Offline or profile sync skipped, using local storage:', err);
           }
 
-          // Subscribe to user transactions in Firestore
+          // Subscribe to user transactions in Firestore & merge safely with offline queue
           unsubscribeTx = subscribeToTransactions(
             user.uid,
             (cloudTransactions) => {
+              const localCurrent = transactionsRef.current;
               if (cloudTransactions && cloudTransactions.length > 0) {
-                setTransactions(cloudTransactions);
-                localStorage.setItem(LOCAL_STORAGE_TX_KEY, JSON.stringify(cloudTransactions));
-              } else if (transactions.length > 0) {
-                transactions.forEach((tx) => {
-                  saveTransaction({
-                    ...tx,
-                    userId: user.uid,
-                  }).catch(console.warn);
-                });
+                const merged = mergeCloudAndLocalTransactions(cloudTransactions, localCurrent);
+                transactionsRef.current = merged;
+                setTransactions(merged);
+                saveLocalTransactions(merged);
+              } else if (localCurrent.length > 0) {
+                const pendingDeletes = new Set(getPendingDeleteIds());
+                localCurrent
+                  .filter((tx) => !pendingDeletes.has(tx.id))
+                  .forEach((tx) => {
+                    saveTransaction({
+                      ...tx,
+                      userId: user.uid,
+                    })
+                      .then(() => markTransactionSynced(tx.id))
+                      .catch(() => markTransactionPendingUpsert(tx.id));
+                  });
               }
             },
             (err) => {
@@ -206,37 +206,45 @@ export default function App() {
       }
       unsubscribeAuth();
     };
-  }, [profile.businessName, profile.ownerName]);
+  }, []);
 
-  // 2b. Re-sync queued offline changes automatically when connection returns
+  // 2. Re-sync queued offline changes automatically when connection returns
   useEffect(() => {
     const syncPendingData = async () => {
-      setIsFirebaseConnected(Boolean(currentUser) && navigator.onLine);
-      if (!currentUser || !navigator.onLine) return;
+      const online = typeof navigator === 'undefined' ? true : navigator.onLine;
+      setIsFirebaseConnected(Boolean(currentUser) && online);
+      if (!currentUser || !online) return;
+
+      let syncedAny = false;
 
       try {
-        const pendingDeletesRaw = localStorage.getItem(LOCAL_STORAGE_PENDING_DELETES_KEY);
-        const pendingDeletes: string[] = pendingDeletesRaw ? JSON.parse(pendingDeletesRaw) : [];
-        if (pendingDeletes.length > 0) {
-          await Promise.all(pendingDeletes.map((id) => removeTransaction(id)));
-          localStorage.removeItem(LOCAL_STORAGE_PENDING_DELETES_KEY);
+        const pendingDeletes = getPendingDeleteIds();
+        for (const id of pendingDeletes) {
+          await removeTransaction(id);
+          clearPendingDelete(id);
+          syncedAny = true;
         }
 
-        const hasPendingSync = localStorage.getItem(LOCAL_STORAGE_PENDING_SYNC_KEY) === 'true';
-        if (hasPendingSync) {
-          const savedTxRaw = localStorage.getItem(LOCAL_STORAGE_TX_KEY);
-          const localTxList: Transaction[] = savedTxRaw ? JSON.parse(savedTxRaw) : [];
-          await Promise.all(
-            localTxList.map((tx) => saveTransaction({ ...tx, userId: currentUser.uid }))
-          );
-
-          const savedProfileRaw = localStorage.getItem(LOCAL_STORAGE_PROFILE_KEY);
-          if (savedProfileRaw) {
-            const localProfile = JSON.parse(savedProfileRaw) as UserProfile;
-            await saveUserProfile({ ...localProfile, userId: currentUser.uid });
+        const pendingUpserts = getPendingUpsertIds();
+        if (pendingUpserts.length > 0) {
+          const localById = new Map(transactionsRef.current.map((tx) => [tx.id, tx]));
+          for (const id of pendingUpserts) {
+            const tx = localById.get(id);
+            if (tx) {
+              await saveTransaction({ ...tx, userId: currentUser.uid });
+            }
+            markTransactionSynced(id);
+            syncedAny = true;
           }
+        }
 
-          localStorage.removeItem(LOCAL_STORAGE_PENDING_SYNC_KEY);
+        if (hasPendingProfileSync()) {
+          await saveUserProfile({ ...profileRef.current, userId: currentUser.uid });
+          setPendingProfileSync(false);
+          syncedAny = true;
+        }
+
+        if (syncedAny) {
           showToast('Koneksi kembali! Catatan offline berhasil disinkronkan.');
         }
       } catch (err) {
@@ -250,7 +258,7 @@ export default function App() {
 
     window.addEventListener('online', syncPendingData);
     window.addEventListener('offline', handleOffline);
-    if (navigator.onLine && currentUser) {
+    if (typeof navigator !== 'undefined' && navigator.onLine && currentUser) {
       syncPendingData();
     }
 
@@ -298,9 +306,14 @@ export default function App() {
           phone: looksLikePhone ? user.emailOrPhone : profile.phone,
         };
         setProfile(updatedProfile);
-        localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(updatedProfile));
+        profileRef.current = updatedProfile;
+        saveLocalProfile(updatedProfile);
         if (auth.currentUser) {
-          saveUserProfile(updatedProfile).catch(console.error);
+          if (typeof navigator === 'undefined' || navigator.onLine) {
+            saveUserProfile(updatedProfile).catch(() => setPendingProfileSync(true));
+          } else {
+            setPendingProfileSync(true);
+          }
         }
       }
 
@@ -421,23 +434,27 @@ export default function App() {
     const userId = authUser ? authUser.uid : 'guest';
     const txId = txData.id || `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
+    const existingTx = txData.id
+      ? transactionsRef.current.find((t) => t.id === txData.id)
+      : undefined;
+
     const newTx: Transaction = {
       ...txData,
       id: txId,
       userId,
-      createdAt: txData.id
-        ? transactions.find((t) => t.id === txData.id)?.createdAt || new Date().toISOString()
-        : new Date().toISOString(),
+      createdAt: existingTx?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    // Update local state immediately for snappy offline-first UX
-    setTransactions((prev) => {
-      const exists = prev.some((t) => t.id === txId);
-      const updated = exists ? prev.map((t) => (t.id === txId ? newTx : t)) : [newTx, ...prev];
-      localStorage.setItem(LOCAL_STORAGE_TX_KEY, JSON.stringify(updated));
-      return updated;
-    });
+    // Persist atomically to localStorage & React state for offline-first reliability
+    const currentList = transactionsRef.current;
+    const exists = currentList.some((t) => t.id === txId);
+    const updatedList = sortTransactionsNewestFirst(
+      exists ? currentList.map((t) => (t.id === txId ? newTx : t)) : [newTx, ...currentList]
+    );
+    transactionsRef.current = updatedList;
+    setTransactions(updatedList);
+    saveLocalTransactions(updatedList);
 
     const isOnlineNow = typeof navigator === 'undefined' ? true : navigator.onLine;
 
@@ -448,12 +465,13 @@ export default function App() {
             ...newTx,
             userId: currentUser.uid,
           });
+          markTransactionSynced(txId);
         } catch (err) {
           console.warn('Cloud sync deferred, saved locally:', err);
-          localStorage.setItem(LOCAL_STORAGE_PENDING_SYNC_KEY, 'true');
+          markTransactionPendingUpsert(txId);
         }
       } else {
-        localStorage.setItem(LOCAL_STORAGE_PENDING_SYNC_KEY, 'true');
+        markTransactionPendingUpsert(txId);
       }
     }
 
@@ -468,31 +486,24 @@ export default function App() {
 
   // Delete Transaction
   const handleDeleteTransaction = async (id: string) => {
-    setTransactions((prev) => {
-      const updated = prev.filter((t) => t.id !== id);
-      localStorage.setItem(LOCAL_STORAGE_TX_KEY, JSON.stringify(updated));
-      return updated;
-    });
+    const updatedList = transactionsRef.current.filter((t) => t.id !== id);
+    transactionsRef.current = updatedList;
+    setTransactions(updatedList);
+    saveLocalTransactions(updatedList);
 
     const isOnlineNow = typeof navigator === 'undefined' ? true : navigator.onLine;
     if (currentUser) {
       if (isOnlineNow) {
         try {
           await removeTransaction(id);
+          clearPendingDelete(id);
+          markTransactionSynced(id);
         } catch (err) {
           console.warn('Cloud delete deferred, removed locally:', err);
-          const pendingRaw = localStorage.getItem(LOCAL_STORAGE_PENDING_DELETES_KEY);
-          const pending: string[] = pendingRaw ? JSON.parse(pendingRaw) : [];
-          if (!pending.includes(id)) {
-            localStorage.setItem(LOCAL_STORAGE_PENDING_DELETES_KEY, JSON.stringify([...pending, id]));
-          }
+          markTransactionPendingDelete(id);
         }
       } else {
-        const pendingRaw = localStorage.getItem(LOCAL_STORAGE_PENDING_DELETES_KEY);
-        const pending: string[] = pendingRaw ? JSON.parse(pendingRaw) : [];
-        if (!pending.includes(id)) {
-          localStorage.setItem(LOCAL_STORAGE_PENDING_DELETES_KEY, JSON.stringify([...pending, id]));
-        }
+        markTransactionPendingDelete(id);
       }
     }
 
@@ -505,8 +516,9 @@ export default function App() {
 
   // Save User Profile
   const handleSaveProfile = async (updated: UserProfile) => {
+    profileRef.current = updated;
     setProfile(updated);
-    localStorage.setItem(LOCAL_STORAGE_PROFILE_KEY, JSON.stringify(updated));
+    saveLocalProfile(updated);
 
     const isOnlineNow = typeof navigator === 'undefined' ? true : navigator.onLine;
     if (currentUser) {
@@ -516,12 +528,13 @@ export default function App() {
             ...updated,
             userId: currentUser.uid,
           });
+          setPendingProfileSync(false);
         } catch (err) {
           console.warn('Profile cloud sync deferred, saved locally:', err);
-          localStorage.setItem(LOCAL_STORAGE_PENDING_SYNC_KEY, 'true');
+          setPendingProfileSync(true);
         }
       } else {
-        localStorage.setItem(LOCAL_STORAGE_PENDING_SYNC_KEY, 'true');
+        setPendingProfileSync(true);
       }
     }
     showToast(
@@ -533,15 +546,25 @@ export default function App() {
 
   // Restore Transactions
   const handleRestoreTransactions = (imported: Transaction[]) => {
-    setTransactions(imported);
-    localStorage.setItem(LOCAL_STORAGE_TX_KEY, JSON.stringify(imported));
+    const sorted = sortTransactionsNewestFirst(imported);
+    transactionsRef.current = sorted;
+    setTransactions(sorted);
+    saveLocalTransactions(sorted);
+
     if (currentUser) {
-      imported.forEach((tx) => {
-        saveTransaction({
-          ...tx,
-          userId: currentUser.uid,
-        }).catch(console.error);
-      });
+      const isOnlineNow = typeof navigator === 'undefined' ? true : navigator.onLine;
+      if (isOnlineNow) {
+        sorted.forEach((tx) => {
+          saveTransaction({
+            ...tx,
+            userId: currentUser.uid,
+          })
+            .then(() => markTransactionSynced(tx.id))
+            .catch(() => markTransactionPendingUpsert(tx.id));
+        });
+      } else {
+        sorted.forEach((tx) => markTransactionPendingUpsert(tx.id));
+      }
     }
   };
 

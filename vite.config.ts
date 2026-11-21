@@ -28,8 +28,8 @@ export default defineConfig({
         description:
           'Aplikasi pencatatan keuangan praktis untuk UMKM dan pemilik warung dengan pemantauan saldo harian, input transaksi cepat, dan laporan laba rugi otomatis yang siap digunakan offline.',
         lang: 'id',
-        theme_color: '#0d9488',
-        background_color: '#f8fafc',
+        theme_color: '#0f766e',
+        background_color: '#073b3a',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
@@ -63,6 +63,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        cacheId: 'cuanumkm-v1.1.0',
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,webmanifest}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         navigateFallback: '/index.html',

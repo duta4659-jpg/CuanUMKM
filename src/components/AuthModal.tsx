@@ -21,6 +21,7 @@ import {
   loginManualAccount,
   requestPasswordReset,
 } from '../firebase';
+import { BrandIcon } from './BrandIcon';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -158,8 +159,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <ArrowLeft className="w-4 h-4" />
               </button>
             )}
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-teal-600 to-teal-500 text-white flex items-center justify-center font-extrabold text-sm shadow-xs">
-              C<span className="text-orange-300">$</span>
+            <div className="w-8 h-8 rounded-lg shadow-xs shrink-0 overflow-hidden">
+              <BrandIcon className="w-8 h-8" />
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-extrabold text-slate-800 leading-tight">

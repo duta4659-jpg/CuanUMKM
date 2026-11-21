@@ -263,9 +263,14 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               <p className="text-xs text-slate-500 font-medium">
                 Pemilik: {ownerName || 'Belum diisi'}
               </p>
-              <div className="flex items-center gap-1 text-[11px] text-teal-700 font-semibold mt-1">
-                <Store className="w-3.5 h-3.5" />
-                <span>Usaha Mikro, Kecil &amp; Menengah</span>
+              <div className="flex items-center gap-2 text-[11px] text-teal-700 font-semibold mt-1 flex-wrap">
+                <span className="inline-flex items-center gap-1">
+                  <Store className="w-3.5 h-3.5" />
+                  <span>Usaha Mikro, Kecil &amp; Menengah</span>
+                </span>
+                <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-bold">
+                  v1.1.0
+                </span>
               </div>
             </div>
           </div>

@@ -439,13 +439,21 @@ export async function saveTransaction(
     return txId;
   }
 
-  const payload: Record<string, any> = {
+  const safeCategory = (transaction.category || 'Lainnya').trim().slice(0, 200) || 'Lainnya';
+  const safeNotes = (transaction.notes || '').trim().slice(0, 500);
+  const safeDate =
+    typeof transaction.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(transaction.date)
+      ? transaction.date
+      : new Date().toISOString().slice(0, 10);
+  const safeAmount = Math.max(1, Number(transaction.amount) || 0);
+
+  const payload: Record<string, unknown> = {
     userId: transaction.userId,
-    type: transaction.type,
-    category: transaction.category,
-    amount: Number(transaction.amount),
-    date: transaction.date,
-    notes: transaction.notes || '',
+    type: transaction.type === 'expense' ? 'expense' : 'income',
+    category: safeCategory,
+    amount: safeAmount,
+    date: safeDate,
+    notes: safeNotes,
     updatedAt: nowIso,
   };
 
@@ -507,15 +515,17 @@ export async function saveUserProfile(profile: UserProfile): Promise<void> {
   }
   const path = `users/${profile.userId}`;
   const nowIso = new Date().toISOString();
+  const payload = {
+    userId: profile.userId,
+    businessName: (profile.businessName || 'Usaha UMKM').trim().slice(0, 100) || 'Usaha UMKM',
+    ownerName: (profile.ownerName || 'Pemilik Usaha').trim().slice(0, 100) || 'Pemilik Usaha',
+    phone: (profile.phone || '').trim().slice(0, 20),
+    address: (profile.address || '').trim().slice(0, 255),
+    initialCash: Number(profile.initialCash) || 0,
+    updatedAt: nowIso,
+  };
   try {
-    await setDoc(
-      doc(db, 'users', profile.userId),
-      {
-        ...profile,
-        updatedAt: nowIso,
-      },
-      { merge: true }
-    );
+    await setDoc(doc(db, 'users', profile.userId), payload, { merge: true });
   } catch (error) {
     if (isOfflineOrNetworkError(error)) {
       return;

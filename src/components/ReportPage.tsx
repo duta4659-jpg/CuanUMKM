@@ -15,6 +15,9 @@ import {
   LineChart,
   HelpCircle,
   CheckCircle,
+  AlertCircle,
+  X,
+  Lightbulb,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -49,6 +52,7 @@ export const ReportPage: React.FC<ReportPageProps> = ({
     return `${today.getFullYear()}-${m}`;
   });
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isEduModalOpen, setIsEduModalOpen] = useState(false);
 
   // Date navigation helpers
   const handlePrevDay = () => {
@@ -370,9 +374,20 @@ _Dicatat otomatis dengan CuanUMKM_`;
       <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-slate-800">
-              Laporan Laba Rugi
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-slate-800">
+                Laporan Laba Rugi
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsEduModalOpen(true)}
+                aria-label="Penting: Penjelasan Laporan Laba Rugi"
+                title="Penting: Penjelasan Laporan Laba Rugi"
+                className="w-6 h-6 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 flex items-center justify-center transition-all active:scale-95 cursor-pointer shrink-0 shadow-2xs"
+              >
+                <span className="text-xs font-black leading-none">!</span>
+              </button>
+            </div>
             <p className="text-xs text-slate-500 mt-0.5">
               Hitungan otomatis pemasukan dikurangi pengeluaran toko
             </p>
@@ -816,6 +831,58 @@ _Dicatat otomatis dengan CuanUMKM_`;
           </div>
         )}
       </div>
+
+      {/* Pop-up Edukasi Laba Rugi */}
+      {isEduModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          onClick={() => setIsEduModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edu-report-title"
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-teal-100 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 bg-gradient-to-r from-teal-800 to-teal-700 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-400/20 border border-amber-300/40 text-amber-200 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <h3 id="edu-report-title" className="text-sm sm:text-base font-extrabold">
+                  Info Penting Laporan Laba Rugi
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEduModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors cursor-pointer"
+                aria-label="Tutup jendela edukasi"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-start gap-3">
+                <Lightbulb className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-xs sm:text-sm text-amber-950 font-semibold leading-relaxed">
+                  Penting: Pengeluaran lebih besar dari pemasukan hari ini belum tentu rugi—sering kali karena stok belanja baru yang akan terjual bertahap di hari-hari berikutnya.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsEduModalOpen(false)}
+                className="w-full py-3 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-sm shadow-sm transition-colors cursor-pointer"
+              >
+                Mengerti
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

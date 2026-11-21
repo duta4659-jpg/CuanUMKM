@@ -1,20 +1,54 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#0f766e" />
-      <stop offset="55%" stop-color="#0d9488" />
-      <stop offset="100%" stop-color="#14b8a6" />
+    <linearGradient id="bgDarkTeal" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#073b3a" />
+      <stop offset="55%" stop-color="#0d5c57" />
+      <stop offset="100%" stop-color="#0f766e" />
     </linearGradient>
-    <linearGradient id="accent" x1="0%" y1="0%" x2="0%" y2="100%">
+    <linearGradient id="barGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#5eead4" stop-opacity="0.72" />
+      <stop offset="100%" stop-color="#ccfbf1" stop-opacity="0.96" />
+    </linearGradient>
+    <linearGradient id="accentGold" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#fed7aa" />
-      <stop offset="100%" stop-color="#fb923c" />
+      <stop offset="100%" stop-color="#f97316" />
     </linearGradient>
+    <filter id="softShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#042f2e" flood-opacity="0.45" />
+    </filter>
   </defs>
-  <rect width="512" height="512" rx="112" ry="112" fill="url(#bg)" />
-  <rect x="24" y="24" width="464" height="464" rx="92" ry="92" fill="none" stroke="#ffffff" stroke-opacity="0.16" stroke-width="6" />
-  <g transform="translate(256, 266)" text-anchor="middle" dominant-baseline="central">
-    <text font-family="'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif" font-weight="800" font-size="250" letter-spacing="-10">
-      <tspan fill="#ffffff">C</tspan><tspan fill="url(#accent)">$</tspan>
-    </text>
+
+  <!-- Dark Teal Rounded App Tile -->
+  <rect width="512" height="512" rx="112" ry="112" fill="url(#bgDarkTeal)" />
+  <rect x="18" y="18" width="476" height="476" rx="96" ry="96" fill="none" stroke="#5eead4" stroke-opacity="0.22" stroke-width="5" />
+
+  <!-- Subtle Grid Baseline -->
+  <line x1="86" y1="398" x2="426" y2="398" stroke="#99f6e4" stroke-opacity="0.35" stroke-width="8" stroke-linecap="round" />
+
+  <!-- Ascending Bar Chart (4 columns) -->
+  <rect x="96" y="294" width="60" height="96" rx="14" fill="url(#barGrad)" />
+  <rect x="178" y="242" width="60" height="148" rx="14" fill="url(#barGrad)" />
+  <rect x="260" y="186" width="60" height="204" rx="14" fill="url(#barGrad)" />
+  <rect x="342" y="122" width="60" height="268" rx="14" fill="#ffffff" fill-opacity="0.96" />
+
+  <!-- Ascending Growth Trend Arrow -->
+  <path d="M110 250 L198 194 L278 148 L372 86" fill="none" stroke="url(#accentGold)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M332 82 L378 82 L378 128" fill="none" stroke="url(#accentGold)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Center Rupiah (Rp) Medallion -->
+  <g filter="url(#softShadow)">
+    <circle cx="256" cy="270" r="88" fill="#094542" stroke="url(#accentGold)" stroke-width="10" />
+    <circle cx="256" cy="270" r="74" fill="none" stroke="#5eead4" stroke-opacity="0.3" stroke-width="3" />
+    <text
+      x="256"
+      y="275"
+      text-anchor="middle"
+      dominant-baseline="central"
+      font-family="'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif"
+      font-weight="800"
+      font-size="88"
+      letter-spacing="-2"
+      fill="#ffffff"
+    >Rp</text>
   </g>
 </svg>
